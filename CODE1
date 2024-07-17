@@ -1,0 +1,83 @@
+import com.microsoft.azure.functions.*;
+import com.microsoft.azure.functions.annotation.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class SumCarsProductionFunction {
+    
+    @FunctionName("SumCarsProduction")
+    public HttpResponseMessage run(
+            @HttpTrigger(name = "req", methods = {HttpMethod.POST}, route = "sum", authLevel = AuthorizationLevel.ANONYMOUS)
+            HttpRequestMessage<Optional<List<CarProduction>>> request,
+            final ExecutionContext context) {
+
+        context.getLogger().info("Java HTTP trigger processed a request.");
+
+        // Check if the request method is POST
+        if (!request.getHttpMethod().equals(HttpMethod.POST)) {
+            return request.createResponseBuilder(HttpStatus.METHOD_NOT_ALLOWED)
+                    .body("Method not allowed")
+                    .build();
+        }
+
+        // Check if plantCode query parameter is provided
+        String plantCode = request.getQueryParameters().getOrDefault("plantCode", null);
+        if (plantCode == null || plantCode.isEmpty()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .body("Missing plantCode parameter")
+                    .build();
+        }
+
+        // Check if request body is present and not empty
+        List<CarProduction> carProductions = request.getBody()
+                .orElse(null);
+        if (carProductions == null || carProductions.isEmpty()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .body("Empty request body")
+                    .build();
+        }
+
+        // Filter and sum car productions by plantCode
+        Map<String, Integer> productionSummary = carProductions.stream()
+                .filter(cp -> cp.getPlantCode().equals(plantCode))
+                .collect(Collectors.groupingBy(CarProduction::getCarStyle,
+                        Collectors.summingInt(CarProduction::getAmount)));
+
+        // Prepare response JSON
+        return request.createResponseBuilder(HttpStatus.OK)
+                .body(productionSummary)
+                .build();
+    }
+
+    // Define the CarProduction class to represent each car production entry
+    public static class CarProduction {
+        private String plantCode;
+        private String carStyle;
+        private int amount;
+
+        // Getters and Setters
+        public String getPlantCode() {
+            return plantCode;
+        }
+
+        public void setPlantCode(String plantCode) {
+            this.plantCode = plantCode;
+        }
+
+        public String getCarStyle() {
+            return carStyle;
+        }
+
+        public void setCarStyle(String carStyle) {
+            this.carStyle = carStyle;
+        }
+
+        public int getAmount() {
+            return amount;
+        }
+
+        public void setAmount(int amount) {
+            this.amount = amount;
+        }
+    }
+}
